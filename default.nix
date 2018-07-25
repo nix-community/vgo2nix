@@ -1,4 +1,4 @@
-{ stdenv, buildGoPackage, callPackage, makeWrapper }:
+{ stdenv, buildGoPackage, callPackage, makeWrapper, nix-prefetch-git }:
 
 let
   vgo = callPackage ./vgo.nix {};
@@ -15,9 +15,10 @@ in buildGoPackage rec {
 
   CGO_ENABLED = 0;
 
-  postInstall = with stdenv; ''
-    wrapProgram $bin/bin/vgo2nix --prefix PATH : ${lib.makeBinPath [ vgo ]}
-
+  postInstall = with stdenv; let
+    binPath = lib.makeBinPath [ nix-prefetch-git vgo ];
+  in ''
+    wrapProgram $bin/bin/vgo2nix --prefix PATH : ${binPath}
   '';
 
 }
