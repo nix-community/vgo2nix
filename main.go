@@ -18,6 +18,17 @@ type Package struct {
 	Sha256        string
 }
 
+const depNixFormat = `
+  {
+    goPackagePath = "%s";
+    fetch = {
+      type = "%s";
+      url = "%s";
+      rev = "%s";
+      sha256 = "%s";
+    };
+  }`
+
 func getPackages() []*Package {
 	var packages []*Package
 
@@ -44,6 +55,8 @@ func getPackages() []*Package {
 		}
 		goPackagePath := l[0]
 		revInfo := l[1]
+
+		fmt.Println(fmt.Sprintf("Processing: %s", goPackagePath))
 
 		repoRoot, err := vcs.RepoRootForImportPath(
 			goPackagePath,
@@ -114,17 +127,12 @@ func main() {
 
 	write("[")
 	for _, pkg := range packages {
-		write("  {")
-		write(fmt.Sprintf("    goPackagePath = \"%s\";", pkg.GoPackagePath))
-		write("    fetch = {")
-		write("      type = \"git\";")
-		write(fmt.Sprintf("      url = \"%s\";", pkg.URL))
-		write(fmt.Sprintf("      rev = \"%s\";", pkg.Rev))
-		write(fmt.Sprintf("      sha256 = \"%s\";", pkg.Sha256))
-		write("    };")
-		write("  }")
-
+		write(fmt.Sprintf(depNixFormat,
+			pkg.GoPackagePath, "git", pkg.URL,
+			pkg.Rev, pkg.Sha256))
 	}
 	write("]")
+
+	fmt.Println("Wrote deps.nix")
 
 }
