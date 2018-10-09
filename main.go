@@ -32,10 +32,9 @@ const depNixFormat = `
 func getPackages() []*Package {
 	var packages []*Package
 
-	commitShaRev, err := regexp.Compile("^v0.0.0-[0-9]{14}-(.*?)$")
-	if err != nil {
-		panic(err)
-	}
+	commitShaRev := regexp.MustCompile("^v0.0.0-[0-9]{14}-(.*?)$")
+	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
+	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
 	modList, err := exec.Command("vgo", "list", "-m", "all").Output()
 	if err != nil {
@@ -56,7 +55,7 @@ func getPackages() []*Package {
 		goPackagePath := l[0]
 		revInfo := l[1]
 
-		fmt.Println(fmt.Sprintf("Processing: %s", goPackagePath))
+		fmt.Println(fmt.Sprintf("Processing goPackagePath: %s", goPackagePath))
 
 		repoRoot, err := vcs.RepoRootForImportPath(
 			goPackagePath,
@@ -68,7 +67,13 @@ func getPackages() []*Package {
 		rev := revInfo
 		if commitShaRev.MatchString(rev) {
 			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
+		} else if commitRevV2.MatchString(rev) {
+			rev = commitRevV2.FindAllStringSubmatch(rev, -1)[0][1]
+		} else if commitRevV3.MatchString(rev) {
+			rev = commitRevV3.FindAllStringSubmatch(rev, -1)[0][1]
 		}
+
+		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", goPackagePath, rev))
 
 		// Get sha256
 		jsonOut, err := exec.Command(
@@ -87,7 +92,8 @@ func getPackages() []*Package {
 		sha256 := resp["sha256"].(string)
 
 		if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
-			panic("Empty sha256")
+			fmt.Println(fmt.Sprintf("Bad SHA256 for %s %s %s", goPackagePath, repoRoot.Repo, rev))
+			//panic("Empty sha256")
 		}
 
 		pkg := &Package{

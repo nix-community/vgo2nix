@@ -19,5 +19,7 @@ in mkShell rec {
     nix-prefetch-git
     vgo
     goNoPropagation
+    darwin.apple_sdk.frameworks.Security
+    jq
   ];
 }
