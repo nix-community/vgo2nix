@@ -2,15 +2,15 @@
 
 buildGoPackage rec {
   name = "vgo-${version}";
-  version = "unstable-2018-07-11";
+  version = "unstable-2018-09-11";
 
   goPackagePath = "golang.org/x/vgo";
 
   src = fetchFromGitHub {
     owner = "golang";
     repo = "vgo";
-    rev = "cc75ec08d5ecfc4072bcefc2c696d1c30af692b9";
-    sha256 = "09bxrwnv2dcq6v9dmh1ydxd0cn6n4pilvglzakzq778xzbm1dgls";
+    rev = "9d567625acf4c5e156b9890bf6feb16eb9fa5c51";
+    sha256 = "1g8m303zyha2hms7qpysi6w99lfwq2fai0vqj19m3m9lc6wylv57";
   };
 
   # Vgo needs access to compiler sources
