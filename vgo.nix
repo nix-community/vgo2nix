@@ -2,7 +2,7 @@
 
 buildGoPackage rec {
   name = "vgo-${version}";
-  version = "unstable-2018-07-12";
+  version = "unstable-2018-09-11";
 
   goPackagePath = "golang.org/x/vgo";
 
