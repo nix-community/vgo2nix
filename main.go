@@ -93,7 +93,10 @@ func getPackages() []*Package {
 
 		if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
 			fmt.Println(fmt.Sprintf("Bad SHA256 for %s %s %s", goPackagePath, repoRoot.Repo, rev))
-			//panic("Empty sha256")
+
+      if !*keepGoing {
+        panic("Exiting due to bad SHA256")
+      }
 		}
 
 		pkg := &Package{
@@ -109,7 +112,7 @@ func getPackages() []*Package {
 }
 
 func main() {
-
+  var keepGoing = flag.Bool("keep-going", false, "Whether to panic or not if a rev cannot be resolved (defaults to `false`)")
 	flag.Parse()
 
 	packages := getPackages()
