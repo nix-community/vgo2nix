@@ -19,7 +19,7 @@ in mkShell rec {
     nix-prefetch-git
     vgo
     goNoPropagation
+  ] ++ stdenv.lib.optionals stdenv.isDarwin [
     darwin.apple_sdk.frameworks.Security
-    jq
   ];
 }
