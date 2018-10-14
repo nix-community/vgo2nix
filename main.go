@@ -36,7 +36,7 @@ func getPackages(keepGoing bool) []*Package {
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
-	modList, err := exec.Command("vgo", "list", "-m", "all").Output()
+	modList, err := exec.Command("go", "list", "-m", "all").Output()
 	if err != nil {
 		panic(err)
 	}

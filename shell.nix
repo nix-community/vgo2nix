@@ -1,7 +1,6 @@
 with (import <nixpkgs> {});
 
 let
-  vgo = callPackage ./vgo.nix {};
 
   # Expose all bin outputs from `go` without
   # propagating their env vars
@@ -9,7 +8,7 @@ let
   # This makes sure we can use gofmt with vgo
   goNoPropagation = runCommand "go-no-propagation" {} ''
     mkdir -p $out/bin
-    for f in ${vgo.passthru.go}/bin/*; do
+    for f in ${go}/bin/*; do
       ln -sf $f $out/bin/$(basename $f)
     done
   '';
@@ -17,7 +16,6 @@ let
 in mkShell rec {
   buildInputs = [
     nix-prefetch-git
-    vgo
     goNoPropagation
   ] ++ stdenv.lib.optionals stdenv.isDarwin [
     darwin.apple_sdk.frameworks.Security
