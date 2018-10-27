@@ -48,12 +48,18 @@ func getPackages(keepGoing bool) []*Package {
 			continue
 		}
 
-		l := strings.SplitN(line, " ", 2)
-		if len(l) != 2 {
+		l := strings.Split(line, " ")
+		var goPackagePath string
+		var revInfo string
+		if len(l) == 2 {
+			goPackagePath = l[0]
+			revInfo = l[1]
+		} else if len(l) == 5 && l[2] == "=>" {
+			goPackagePath = l[3]
+			revInfo = l[4]
+		} else {
 			panic("Wrong length")
 		}
-		goPackagePath := l[0]
-		revInfo := l[1]
 
 		fmt.Println(fmt.Sprintf("Processing goPackagePath: %s", goPackagePath))
 
