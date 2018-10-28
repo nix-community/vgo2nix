@@ -1,14 +1,16 @@
 package main // import "github.com/adisbladis/vgo2nix"
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"golang.org/x/tools/go/vcs"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"golang.org/x/tools/go/vcs"
 )
 
 type Package struct {
@@ -36,12 +38,17 @@ func getPackages(keepGoing bool) []*Package {
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
-	modList, err := exec.Command("go", "list", "-m", "all").Output()
+	cmd := exec.Command("go", "list", "-m", "all")
+	var modList, stderr bytes.Buffer
+	cmd.Stdout = &modList
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "'go list -m all' failed with %s:\n%s", err, stderr.String())
+		os.Exit(1)
 	}
 	// First line is always current module
-	lines := strings.Split(string(modList), "\n")[1:]
+	lines := strings.Split(modList.String(), "\n")[1:]
 
 	for _, line := range lines {
 		if line == "" {
