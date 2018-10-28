@@ -31,7 +31,7 @@ const depNixFormat = `
     };
   }`
 
-func getPackages(keepGoing bool) []*Package {
+func getPackages(keepGoing bool, prevDeps map[string]*Package) []*Package {
 	var packages []*Package
 
 	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-[0-9]{14}-(.*?)$`)
@@ -70,13 +70,6 @@ func getPackages(keepGoing bool) []*Package {
 
 		fmt.Println(fmt.Sprintf("Processing goPackagePath: %s", goPackagePath))
 
-		repoRoot, err := vcs.RepoRootForImportPath(
-			goPackagePath,
-			true)
-		if err != nil {
-			panic(err)
-		}
-
 		rev := revInfo
 		if commitShaRev.MatchString(rev) {
 			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
@@ -88,36 +81,52 @@ func getPackages(keepGoing bool) []*Package {
 
 		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", goPackagePath, rev))
 
-		// Get sha256
-		jsonOut, err := exec.Command(
-			"nix-prefetch-git",
-			"--quiet",
-			"--url", repoRoot.Repo,
-			"--rev", rev).Output()
-
-		if err != nil {
-			panic(err)
-		}
-		var resp map[string]interface{}
-		if err := json.Unmarshal(jsonOut, &resp); err != nil {
-			panic(err)
-		}
-		sha256 := resp["sha256"].(string)
-
-		if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
-			fmt.Println(fmt.Sprintf("Bad SHA256 for %s %s %s", goPackagePath, repoRoot.Repo, rev))
-
-			if !keepGoing {
-				panic("Exiting due to bad SHA256")
+		var pkg *Package
+		if prevPkg, ok := prevDeps[goPackagePath]; ok {
+			if prevPkg.Rev == rev {
+				pkg = prevPkg
 			}
 		}
 
-		pkg := &Package{
-			GoPackagePath: goPackagePath,
-			URL:           repoRoot.Repo,
-			Rev:           rev,
-			Sha256:        sha256,
+		if pkg == nil {
+			repoRoot, err := vcs.RepoRootForImportPath(
+				goPackagePath,
+				true)
+			if err != nil {
+				panic(err)
+			}
+
+			jsonOut, err := exec.Command(
+				"nix-prefetch-git",
+				"--quiet",
+				"--url", repoRoot.Repo,
+				"--rev", rev).Output()
+
+			if err != nil {
+				panic(err)
+			}
+			var resp map[string]interface{}
+			if err := json.Unmarshal(jsonOut, &resp); err != nil {
+				panic(err)
+			}
+			sha256 := resp["sha256"].(string)
+
+			if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
+				fmt.Println(fmt.Sprintf("Bad SHA256 for %s %s %s", goPackagePath, repoRoot.Repo, rev))
+
+				if !keepGoing {
+					panic("Exiting due to bad SHA256")
+				}
+			}
+
+			pkg = &Package{
+				GoPackagePath: goPackagePath,
+				URL:           repoRoot.Repo,
+				Rev:           rev,
+				Sha256:        sha256,
+			}
 		}
+
 		packages = append(packages, pkg)
 	}
 
@@ -128,7 +137,9 @@ func main() {
 	var keepGoing = flag.Bool("keep-going", false, "Whether to panic or not if a rev cannot be resolved (defaults to `false`)")
 	flag.Parse()
 
-	packages := getPackages(*keepGoing)
+	// Load previous deps from deps.nix so we can reuse hashes for known revs
+	prevDeps := loadDepsNix()
+	packages := getPackages(*keepGoing, prevDeps)
 
 	outfile, err := os.Create("deps.nix")
 	if err != nil {
