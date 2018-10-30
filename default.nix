@@ -1,6 +1,6 @@
 { stdenv, lib, buildGoPackage, go, makeWrapper, nix-prefetch-git }:
 
-assert lib.versionAtLeast go "1.11";
+assert lib.versionAtLeast go.version "1.11";
 buildGoPackage rec {
   name = "vgo2nix-${version}";
   version = "0.0.1";
