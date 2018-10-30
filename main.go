@@ -39,6 +39,9 @@ func getPackages(keepGoing bool, prevDeps map[string]*Package) []*Package {
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
 	cmd := exec.Command("go", "list", "-m", "all")
+	cmd.Env = append(os.Environ(),
+		"GO111MODULE=on",
+	)
 	var modList, stderr bytes.Buffer
 	cmd.Stdout = &modList
 	cmd.Stderr = &stderr
