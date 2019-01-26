@@ -7,9 +7,8 @@ import (
 	"os"
 )
 
-func loadDepsNix() map[string]*Package {
+func loadDepsNix(filePath string) map[string]*Package {
 	ret := make(map[string]*Package)
-	filePath := "./deps.nix"
 
 	stat, err := os.Stat(filePath)
 	if err != nil {

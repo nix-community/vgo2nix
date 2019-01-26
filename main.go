@@ -137,14 +137,24 @@ func getPackages(keepGoing bool, prevDeps map[string]*Package) []*Package {
 }
 
 func main() {
-	var keepGoing = flag.Bool("keep-going", false, "Whether to panic or not if a rev cannot be resolved (defaults to `false`)")
+	var keepGoing = flag.Bool("keep-going", false, "Whether to panic or not if a rev cannot be resolved (default \"false\")")
+	var goDir = flag.String("dir", "./", "Go project directory")
+	var out = flag.String("outfile", "deps.nix", "deps.nix output file (relative to project directory)")
 	flag.Parse()
 
+	// Go modules are not relying on GOPATH
+	os.Unsetenv("GOPATH")
+
+	err := os.Chdir(*goDir)
+	if err != nil {
+		panic(err)
+	}
+
 	// Load previous deps from deps.nix so we can reuse hashes for known revs
-	prevDeps := loadDepsNix()
+	prevDeps := loadDepsNix("./deps.nix")
 	packages := getPackages(*keepGoing, prevDeps)
 
-	outfile, err := os.Create("deps.nix")
+	outfile, err := os.Create(*out)
 	if err != nil {
 		panic(err)
 	}
