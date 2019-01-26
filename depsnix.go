@@ -1,40 +1,64 @@
 package main
 
 import (
-	"encoding/json"
-	"os/exec"
+	"github.com/orivej/go-nix/nix/eval"
+	"github.com/orivej/go-nix/nix/parser"
+	"log"
+	"os"
 )
 
 func loadDepsNix() map[string]*Package {
 	ret := make(map[string]*Package)
+	filePath := "./deps.nix"
 
-	jsonOut, err := exec.Command(
-		"nix-instantiate",
-		"--eval",
-		"--expr", "builtins.toJSON (import ./deps.nix)",
-	).Output()
+	stat, err := os.Stat(filePath)
 	if err != nil {
 		return ret
 	}
-
-	var layer1JSON string
-	if err := json.Unmarshal(jsonOut, &layer1JSON); err != nil {
-		panic(err)
+	if stat.Size() == 0 {
+		return ret
 	}
 
-	var layer2JSON []map[string]interface{}
-	if err := json.Unmarshal([]byte(layer1JSON), &layer2JSON); err != nil {
-		panic(err)
+	p, err := parser.ParseFile(filePath)
+	if err != nil {
+		log.Println("Failed reading deps.nix")
+		return ret
 	}
 
-	for _, pkg := range layer2JSON {
-		goPackagePath := pkg["goPackagePath"].(string)
-		fetch := pkg["fetch"].(map[string]interface{})
+	evalResult := eval.ParseResult(p)
+	for _, pkgAttrsExpr := range evalResult.(eval.List) {
+		pkgAttrs, ok := pkgAttrsExpr.Eval().(eval.Set)
+		if !ok {
+			continue
+		}
+		fetch, ok := pkgAttrs[eval.Intern("fetch")].Eval().(eval.Set)
+		if !ok {
+			continue
+		}
+
+		goPackagePath, ok := pkgAttrs[eval.Intern("goPackagePath")].Eval().(string)
+		if !ok {
+			continue
+		}
+
+		url, ok := fetch[eval.Intern("url")].Eval().(string)
+		if !ok {
+			continue
+		}
+		rev, ok := fetch[eval.Intern("rev")].Eval().(string)
+		if !ok {
+			continue
+		}
+		sha256, ok := fetch[eval.Intern("sha256")].Eval().(string)
+		if !ok {
+			continue
+		}
+
 		ret[goPackagePath] = &Package{
 			GoPackagePath: goPackagePath,
-			URL: fetch["url"].(string),
-			Rev: fetch["rev"].(string),
-			Sha256: fetch["sha256"].(string),
+			URL:           url,
+			Rev:           rev,
+			Sha256:        sha256,
 		}
 	}
 
