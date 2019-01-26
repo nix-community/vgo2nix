@@ -30,8 +30,7 @@ type packageListEntry struct {
 	rev           string
 }
 
-const depNixFormat = `
-  {
+const depNixFormat = `  {
     goPackagePath = "%s";
     fetch = {
       type = "%s";
