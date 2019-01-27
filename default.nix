@@ -3,12 +3,15 @@ with import <nixpkgs> {};
 assert lib.versionAtLeast go.version "1.11";
 buildGoPackage rec {
   name = "vgo2nix-${version}";
-  version = "unstable-2018-10-14";
+  version = "git";
   goPackagePath = "github.com/adisbladis/vgo2nix";
 
   nativeBuildInputs = [ makeWrapper ];
 
-  src = lib.cleanSource ./.;
+  src = lib.cleanSourceWith {
+    filter = name: type: builtins.match ".*tests.*" name == null;
+    src = (lib.cleanSource ./.);
+  };
 
   goDeps = ./deps.nix;
 

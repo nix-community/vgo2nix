@@ -1,0 +1,4 @@
+github.com/ugorji/go v1.1.2 h1:JON3E2/GPW2iDNGoSAusl1KDf5TRQ8k8q7Tp097pZGs=
+github.com/ugorji/go v1.1.2/go.mod h1:hnLbHMwcvSihnDhEfx2/BzKp2xb0Y+ErdfYcrs9tkJQ=
+github.com/ugorji/go/codec v0.0.0-20190126102652-8fd0f8d918c8 h1:X8lhf4a2HZiqw4DKNWz9aFZdssVV69au98QlhPXrEp8=
+github.com/ugorji/go/codec v0.0.0-20190126102652-8fd0f8d918c8/go.mod h1:iT03XoTwV7xq/+UGwKO3UbC1nNNlopQiY61beSdrtOA=

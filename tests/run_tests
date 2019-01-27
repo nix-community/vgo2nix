@@ -1,0 +1,51 @@
+#!/usr/bin/env nix-shell
+#! nix-shell ./shell.nix -i python3
+import subprocess
+import tempfile
+import difflib
+import filecmp
+import os.path
+import shutil
+import sys
+import os
+
+
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def run_testdir(testdir, workdir):
+    for f in os.listdir(testdir):
+        shutil.copy(
+            os.path.join(testdir, f),
+            os.path.join(workdir, f))
+
+    subprocess.run([
+        'vgo2nix',
+        '--dir', workdir,
+    ])
+
+    deps_path = os.path.join(workdir, 'deps.nix')
+    exp_path = os.path.join(workdir, 'expected.nix')
+
+    if not filecmp.cmp(
+            deps_path,
+            exp_path,
+            shallow=False):
+        diff = difflib.unified_diff(
+            open(exp_path).readlines(),
+            open(deps_path).readlines(),
+            fromfile='expected.nix',
+            tofile='deps.nix')
+        for line in diff:
+            sys.stderr.write(line)
+        exit(1)
+
+
+if __name__ == '__main__':
+    for testdir in os.listdir(TESTS_DIR):
+        testdir = os.path.join(TESTS_DIR, testdir)
+        if not os.path.isdir(testdir):
+            continue
+
+        with tempfile.TemporaryDirectory() as workdir:
+            run_testdir(testdir, workdir)
