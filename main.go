@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 )
 
 type Package struct {
@@ -26,8 +27,8 @@ type PackageResult struct {
 }
 
 type modEntry struct {
-	goPackagePath string
-	rev           string
+	importPath string
+	rev        string
 }
 
 const depNixFormat = `  {
@@ -98,8 +99,8 @@ func getModules() ([]*modEntry, error) {
 		}
 		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", mod.Path, rev))
 		entries = append(entries, &modEntry{
-			goPackagePath: mod.Path,
-			rev:           rev,
+			importPath: mod.Path,
+			rev:        rev,
 		})
 	}
 
@@ -113,20 +114,18 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 	}
 
 	processEntry := func(entry *modEntry) (*Package, error) {
-		goPackagePath := entry.goPackagePath
-		rev := entry.rev
-
-		if prevPkg, ok := prevDeps[goPackagePath]; ok {
-			if prevPkg.Rev == rev {
-				return prevPkg, nil
-			}
-		}
-
 		repoRoot, err := vcs.RepoRootForImportPath(
-			goPackagePath,
-			true)
+			entry.importPath,
+			false)
 		if err != nil {
 			return nil, err
+		}
+		goPackagePath := repoRoot.Root
+
+		if prevPkg, ok := prevDeps[goPackagePath]; ok {
+			if prevPkg.Rev == entry.rev {
+				return prevPkg, nil
+			}
 		}
 
 		fmt.Println(fmt.Sprintf("Fetching %s", goPackagePath))
@@ -134,7 +133,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			"nix-prefetch-git",
 			"--quiet",
 			"--url", repoRoot.Repo,
-			"--rev", rev).Output()
+			"--rev", entry.rev).Output()
 		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
 
 		if err != nil {
@@ -147,7 +146,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		sha256 := resp["sha256"].(string)
 
 		if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
-			fmt.Println(fmt.Sprintf("Bad SHA256 for %s %s %s", goPackagePath, repoRoot.Repo, rev))
+			fmt.Println(fmt.Sprintf("Bad SHA256 for %s %s %s", goPackagePath, repoRoot.Repo, entry.rev))
 
 			if !keepGoing {
 				return nil, fmt.Errorf("Exiting due to bad SHA256")
@@ -155,9 +154,9 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		}
 
 		return &Package{
-			GoPackagePath: goPackagePath,
+			GoPackagePath: repoRoot.Root,
 			URL:           repoRoot.Repo,
-			Rev:           rev,
+			Rev:           entry.rev,
 			Sha256:        sha256,
 		}, nil
 	}
@@ -193,11 +192,19 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		pkgsMap[result.Package.GoPackagePath] = result.Package
 	}
 
-	// Return packages in correct order
+	// Make output order stable
 	var packages []*Package
-	for _, entry := range entries {
-		packages = append(packages, pkgsMap[entry.goPackagePath])
+
+	keys := make([]string, 0, len(pkgsMap))
+	for k := range pkgsMap {
+		keys = append(keys, k)
 	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		packages = append(packages, pkgsMap[k])
+	}
+
 	return packages, nil
 }
 
