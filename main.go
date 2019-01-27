@@ -6,11 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"golang.org/x/tools/go/vcs"
+	"io"
 	"math"
 	"os"
 	"os/exec"
 	"regexp"
-	"strings"
 )
 
 type Package struct {
@@ -25,7 +25,7 @@ type PackageResult struct {
 	Error   error
 }
 
-type packageListEntry struct {
+type modEntry struct {
 	goPackagePath string
 	rev           string
 }
@@ -40,49 +40,55 @@ const depNixFormat = `  {
     };
   }`
 
-// extractPackages - Extract a list of packages and their revs
-func extractPackages() ([]*packageListEntry, error) {
-	var entries []*packageListEntry
+func getModules() ([]*modEntry, error) {
+	var entries []*modEntry
 
 	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-[0-9]{14}-(.*?)$`)
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
-	cmd := exec.Command("go", "list", "-m", "all")
+	var stderr bytes.Buffer
+	cmd := exec.Command("go", "list", "-json", "-m", "all")
+	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(),
 		"GO111MODULE=on",
 	)
-	var modList, stderr bytes.Buffer
-	cmd.Stdout = &modList
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		return nil, err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	type goMod struct {
+		Path    string
+		Main    bool
+		Version string
+	}
+
+	var mods []goMod
+	dec := json.NewDecoder(stdout)
+	for {
+		var mod goMod
+		if err := dec.Decode(&mod); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		if !mod.Main {
+			mods = append(mods, mod)
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
 		return nil, fmt.Errorf("'go list -m all' failed with %s:\n%s", err, stderr.String())
 	}
-	// First line is always current module
-	lines := strings.Split(modList.String(), "\n")[1:]
 
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-
-		l := strings.Split(line, " ")
-		var goPackagePath string
-		var revInfo string
-		if len(l) == 2 {
-			goPackagePath = l[0]
-			revInfo = l[1]
-		} else if len(l) == 5 && l[2] == "=>" {
-			goPackagePath = l[3]
-			revInfo = l[4]
-		} else {
-			return nil, fmt.Errorf("Wrong length")
-		}
-
-		fmt.Println(fmt.Sprintf("Processing goPackagePath: %s", goPackagePath))
-
-		rev := revInfo
+	for _, mod := range mods {
+		rev := mod.Version
 		if commitShaRev.MatchString(rev) {
 			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
 		} else if commitRevV2.MatchString(rev) {
@@ -90,11 +96,9 @@ func extractPackages() ([]*packageListEntry, error) {
 		} else if commitRevV3.MatchString(rev) {
 			rev = commitRevV3.FindAllStringSubmatch(rev, -1)[0][1]
 		}
-
-		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", goPackagePath, rev))
-
-		entries = append(entries, &packageListEntry{
-			goPackagePath: goPackagePath,
+		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", mod.Path, rev))
+		entries = append(entries, &modEntry{
+			goPackagePath: mod.Path,
 			rev:           rev,
 		})
 	}
@@ -103,12 +107,12 @@ func extractPackages() ([]*packageListEntry, error) {
 }
 
 func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*Package, error) {
-	entries, err := extractPackages()
+	entries, err := getModules()
 	if err != nil {
 		return nil, err
 	}
 
-	processEntry := func(entry *packageListEntry) (*Package, error) {
+	processEntry := func(entry *modEntry) (*Package, error) {
 		goPackagePath := entry.goPackagePath
 		rev := entry.rev
 
@@ -158,7 +162,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		}, nil
 	}
 
-	worker := func(entries <-chan *packageListEntry, results chan<- *PackageResult) {
+	worker := func(entries <-chan *modEntry, results chan<- *PackageResult) {
 		for entry := range entries {
 			pkg, err := processEntry(entry)
 			result := &PackageResult{
@@ -169,7 +173,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		}
 	}
 
-	jobs := make(chan *packageListEntry, 100)
+	jobs := make(chan *modEntry, 100)
 	results := make(chan *PackageResult, 100)
 	for w := 1; w <= int(math.Min(float64(len(entries)), float64(numJobs))); w++ {
 		go worker(jobs, results)
