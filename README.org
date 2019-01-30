@@ -1,3 +1,24 @@
+[[https://travis-ci.org/adisbladis/vgo2nix][https://travis-ci.org/adisbladis/vgo2nix.svg?branch=master]]
+
 * vgo2nix
 
 Convert =go.mod= files to nixpkgs =buildGoPackage= compatible =deps.nix= files
+
+** Usage
+From the go project directory execute
+#+begin_src
+vgo2nix
+#+end_src
+
+This will write a file called =deps.nix= that is to be used together with an expression like
+#+begin_src nix
+{ buildGoPackage }:
+buildGoPackage rec {
+  name = "vgo2nix-${version}";
+  version = "example";
+  src = fetchFromGitHub { ... };  # Incomplete
+  goDeps = ./deps.nix;
+}
+#+end_src
+
+For more in-depth usage there is an excellent guide here: https://github.com/MatrixAI/Golang-Demo
