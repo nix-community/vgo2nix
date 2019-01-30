@@ -114,11 +114,15 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 	}
 
 	processEntry := func(entry *modEntry) (*Package, error) {
+		wrapError := func(err error) error {
+			return fmt.Errorf("Error processing import path \"%s\": %v", entry.importPath, err)
+		}
+
 		repoRoot, err := vcs.RepoRootForImportPath(
 			entry.importPath,
 			false)
 		if err != nil {
-			return nil, err
+			return nil, wrapError(err)
 		}
 		goPackagePath := repoRoot.Root
 
@@ -137,20 +141,16 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
 
 		if err != nil {
-			return nil, err
+			return nil, wrapError(err)
 		}
 		var resp map[string]interface{}
 		if err := json.Unmarshal(jsonOut, &resp); err != nil {
-			return nil, err
+			return nil, wrapError(err)
 		}
 		sha256 := resp["sha256"].(string)
 
 		if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
-			fmt.Println(fmt.Sprintf("Bad SHA256 for %s %s %s", goPackagePath, repoRoot.Repo, entry.rev))
-
-			if !keepGoing {
-				return nil, fmt.Errorf("Exiting due to bad SHA256")
-			}
+			return nil, wrapError(fmt.Errorf("Bad SHA256 for repo %s with rev %s", repoRoot.Repo, entry.rev))
 		}
 
 		return &Package{
@@ -187,7 +187,11 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 	for j := 1; j <= len(entries); j++ {
 		result := <-results
 		if result.Error != nil {
-			return nil, result.Error
+			if !keepGoing {
+				return nil, result.Error
+			}
+			msg := fmt.Sprintf("Encountered error: %v", result.Error)
+			fmt.Println(msg)
 		}
 		pkgsMap[result.Package.GoPackagePath] = result.Package
 	}
