@@ -216,6 +216,7 @@ func main() {
 	var keepGoing = flag.Bool("keep-going", false, "Whether to panic or not if a rev cannot be resolved (default \"false\")")
 	var goDir = flag.String("dir", "./", "Go project directory")
 	var out = flag.String("outfile", "deps.nix", "deps.nix output file (relative to project directory)")
+	var in = flag.String("infile", "deps.nix", "deps.nix input file (relative to project directory)")
 	var jobs = flag.Int("jobs", 20, "Number of parallel jobs")
 	flag.Parse()
 
@@ -228,7 +229,7 @@ func main() {
 	}
 
 	// Load previous deps from deps.nix so we can reuse hashes for known revs
-	prevDeps := loadDepsNix("./deps.nix")
+	prevDeps := loadDepsNix(*in)
 	packages, err := getPackages(*keepGoing, *jobs, prevDeps)
 	if err != nil {
 		panic(err)
@@ -260,6 +261,5 @@ func main() {
 	}
 	write("]")
 
-	fmt.Println("Wrote deps.nix")
-
+	fmt.Println(fmt.Sprintf("Wrote %s", *out))
 }
