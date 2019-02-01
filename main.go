@@ -220,9 +220,6 @@ func main() {
 	var jobs = flag.Int("jobs", 20, "Number of parallel jobs")
 	flag.Parse()
 
-	// Go modules are not relying on GOPATH
-	os.Unsetenv("GOPATH")
-
 	err := os.Chdir(*goDir)
 	if err != nil {
 		panic(err)
