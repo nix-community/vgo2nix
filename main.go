@@ -133,9 +133,15 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		}
 
 		fmt.Println(fmt.Sprintf("Fetching %s", goPackagePath))
+		// The options for nix-prefetch-git need to match how buildGoPackage
+		// calls fetchgit:
+		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/development/go-modules/generic/default.nix#L54-L56
+		// and fetchgit's defaults:
+		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/build-support/fetchgit/default.nix#L15-L23
 		jsonOut, err := exec.Command(
 			"nix-prefetch-git",
 			"--quiet",
+			"--fetch-submodules",
 			"--url", repoRoot.Repo,
 			"--rev", entry.rev).Output()
 		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
