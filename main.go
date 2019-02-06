@@ -198,6 +198,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			}
 			msg := fmt.Sprintf("Encountered error: %v", result.Error)
 			fmt.Println(msg)
+			continue
 		}
 		pkgsMap[result.Package.GoPackagePath] = result.Package
 	}
