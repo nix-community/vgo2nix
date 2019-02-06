@@ -44,7 +44,7 @@ const depNixFormat = `  {
 func getModules() ([]*modEntry, error) {
 	var entries []*modEntry
 
-	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-[0-9]{14}-(.*?)$`)
+	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:\d+\.)?[0-9]{14}-(.*?)$`)
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
