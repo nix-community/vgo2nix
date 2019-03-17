@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 type Package struct {
@@ -107,7 +108,7 @@ func getModules() ([]*modEntry, error) {
 	return entries, nil
 }
 
-func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*Package, error) {
+func getPackages(keepGoing bool, numJobs int, githubSSH bool, prevDeps map[string]*Package) ([]*Package, error) {
 	entries, err := getModules()
 	if err != nil {
 		return nil, err
@@ -132,7 +133,11 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			}
 		}
 
-		fmt.Println(fmt.Sprintf("Fetching %s", goPackagePath))
+		if githubSSH {
+			repoRoot.Repo = strings.Replace(repoRoot.Repo, "https://github.com/", "ssh://git@github.com/", 1)
+		}
+
+		fmt.Println(fmt.Sprintf("Fetching %s: (%s %s)", goPackagePath, repoRoot.Repo, entry.rev))
 		// The options for nix-prefetch-git need to match how buildGoPackage
 		// calls fetchgit:
 		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/development/go-modules/generic/default.nix#L54-L56
@@ -225,6 +230,7 @@ func main() {
 	var out = flag.String("outfile", "deps.nix", "deps.nix output file (relative to project directory)")
 	var in = flag.String("infile", "deps.nix", "deps.nix input file (relative to project directory)")
 	var jobs = flag.Int("jobs", 20, "Number of parallel jobs")
+	var githubSSH = flag.Bool("github-ssh", false, "Use SSH connections with github (default: \"false\")")
 	flag.Parse()
 
 	err := os.Chdir(*goDir)
@@ -234,7 +240,7 @@ func main() {
 
 	// Load previous deps from deps.nix so we can reuse hashes for known revs
 	prevDeps := loadDepsNix(*in)
-	packages, err := getPackages(*keepGoing, *jobs, prevDeps)
+	packages, err := getPackages(*keepGoing, *jobs, *githubSSH, prevDeps)
 	if err != nil {
 		panic(err)
 	}
