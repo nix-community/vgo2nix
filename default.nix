@@ -1,4 +1,5 @@
-with import <nixpkgs> {};
+{ pkgs ? import <nixpkgs> {} }:
+with pkgs;
 
 assert lib.versionAtLeast go.version "1.11";
 buildGoPackage rec {
