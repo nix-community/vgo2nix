@@ -1,7 +1,7 @@
 with import <nixpkgs> {};
 
 let
-  vgo2nix = import ../default.nix;
+  vgo2nix = import ../default.nix {};
 
 in mkShell {
   buildInputs = [
