@@ -55,8 +55,7 @@ type Package struct {
 type Packages []*Package
 type PackageIndex map[string]*Package
 
-const dependencyTemplate = `
-  {
+const dependencyTemplate = `  {
     goPackagePath = "%s";
     fetch = {
       type = "%s";
@@ -64,8 +63,7 @@ const dependencyTemplate = `
       rev = "%s";
       sha256 = "%s";
     };
-  }
-`
+  }`
 
 //
 
