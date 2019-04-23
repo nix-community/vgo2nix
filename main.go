@@ -412,7 +412,7 @@ func main() {
 		keepGoing:  flag.Bool("keep-going", false, "Whether to fail or not if a rev cannot be resolved"),
 		verbose:    flag.Bool("verbose", false, "Turn on verbose mode"),
 		index:      flag.String("index", "deps.nix", "Nix depdendencies index path"),
-		projectDir: flag.String("work-dir", workDir, "Project directory"),
+		projectDir: flag.String("dir", workDir, "Project directory"),
 		rewrites:   &rewrites,
 	}}
 	flag.Parse()
