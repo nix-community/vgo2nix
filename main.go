@@ -178,8 +178,8 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		}
 	}
 
-	jobs := make(chan *modEntry, 100)
-	results := make(chan *PackageResult, 100)
+	jobs := make(chan *modEntry, len(entries))
+	results := make(chan *PackageResult, len(entries))
 	for w := 1; w <= int(math.Min(float64(len(entries)), float64(numJobs))); w++ {
 		go worker(jobs, results)
 	}
