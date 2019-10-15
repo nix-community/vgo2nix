@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 type Package struct {
@@ -107,7 +108,7 @@ func getModules() ([]*modEntry, error) {
 	return entries, nil
 }
 
-func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*Package, error) {
+func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package, urlPrefixReplacements map[string]string) ([]*Package, error) {
 	entries, err := getModules()
 	if err != nil {
 		return nil, err
@@ -129,6 +130,13 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		if prevPkg, ok := prevDeps[goPackagePath]; ok {
 			if prevPkg.Rev == entry.rev {
 				return prevPkg, nil
+			}
+		}
+
+		for prefix, replacement := range urlPrefixReplacements {
+			if strings.HasPrefix(repoRoot.Repo, prefix) {
+				repoRoot.Repo = strings.Replace(repoRoot.Repo, prefix, replacement, 1)
+				break
 			}
 		}
 
@@ -219,12 +227,39 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 	return packages, nil
 }
 
+type urlMap map[string]string
+
+func (m urlMap) Set(argStr string) error {
+	pieces := strings.SplitN(argStr, "=", 2)
+	if len(pieces) < 2 {
+		return fmt.Errorf(`URL map entry %+v must contain a '=' character`, argStr)
+	}
+	key := pieces[0]
+	value := pieces[1]
+	_, alreadyPresent := m[key]
+	if alreadyPresent {
+		return fmt.Errorf(`URL map entry %+v present more than once`, key)
+	}
+	m[key] = value
+	return nil
+}
+func (m urlMap) String() string {
+	var b strings.Builder
+	for k, v := range m {
+		fmt.Fprintf(&b, "%v => %v; ", k, v)
+	}
+	return b.String()
+}
+
 func main() {
 	var keepGoing = flag.Bool("keep-going", false, "Whether to panic or not if a rev cannot be resolved (default \"false\")")
 	var goDir = flag.String("dir", "./", "Go project directory")
 	var out = flag.String("outfile", "deps.nix", "deps.nix output file (relative to project directory)")
 	var in = flag.String("infile", "deps.nix", "deps.nix input file (relative to project directory)")
 	var jobs = flag.Int("jobs", 20, "Number of parallel jobs")
+	var urlPrefixMap urlMap = make(urlMap)
+
+	flag.Var(&urlPrefixMap, "urlPrefixMap", `Map of URL prefix changes, of form ORIG=NEW (example: "https://github.com/=git@github.com:")`)
 	flag.Parse()
 
 	err := os.Chdir(*goDir)
@@ -234,7 +269,7 @@ func main() {
 
 	// Load previous deps from deps.nix so we can reuse hashes for known revs
 	prevDeps := loadDepsNix(*in)
-	packages, err := getPackages(*keepGoing, *jobs, prevDeps)
+	packages, err := getPackages(*keepGoing, *jobs, prevDeps, urlPrefixMap)
 	if err != nil {
 		panic(err)
 	}
