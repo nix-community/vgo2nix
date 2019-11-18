@@ -145,8 +145,6 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			"--fetch-submodules",
 			"--url", repoRoot.Repo,
 			"--rev", entry.rev).Output()
-		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
-
 		if err != nil {
 			exitError, ok := err.(*exec.ExitError)
 			if ok {
@@ -159,6 +157,8 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 				return nil, wrapError(fmt.Errorf("failed to execute nix-prefetch-git: %v", err))
 			}
 		}
+		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
+
 		var resp map[string]interface{}
 		if err := json.Unmarshal(jsonOut, &resp); err != nil {
 			return nil, wrapError(err)
