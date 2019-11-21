@@ -22,3 +22,7 @@ buildGoPackage rec {
 #+end_src
 
 For more in-depth usage there is an excellent guide here: https://github.com/MatrixAI/Golang-Demo
+
+** Known issues
+
+vgo2nix currently only supports git dependencies
