@@ -28,8 +28,9 @@ type PackageResult struct {
 }
 
 type modEntry struct {
-	importPath string
-	rev        string
+	importPath  string
+	replacePath string
+	rev         string
 }
 
 const depNixFormat = `  {
@@ -65,6 +66,7 @@ func getModules() ([]*modEntry, error) {
 	}
 
 	type goModReplacement struct {
+		Path    string
 		Version string
 	}
 
@@ -107,10 +109,15 @@ func getModules() ([]*modEntry, error) {
 		} else if commitRevV3.MatchString(rev) {
 			rev = commitRevV3.FindAllStringSubmatch(rev, -1)[0][1]
 		}
+		replacePath := mod.Path
+		if mod.Replace != nil {
+			replacePath = mod.Replace.Path
+		}
 		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", mod.Path, rev))
 		entries = append(entries, &modEntry{
-			importPath: mod.Path,
-			rev:        rev,
+			replacePath: replacePath,
+			importPath:  mod.Path,
+			rev:         rev,
 		})
 	}
 
@@ -129,12 +136,19 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		}
 
 		repoRoot, err := vcs.RepoRootForImportPath(
+			entry.replacePath,
+			false)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		importRoot, err := vcs.RepoRootForImportPath(
 			entry.importPath,
 			false)
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		goPackagePath := repoRoot.Root
+		goPackagePath := importRoot.Root
 
 		if prevPkg, ok := prevDeps[goPackagePath]; ok {
 			if prevPkg.Rev == entry.rev {
@@ -179,7 +193,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		}
 
 		return &Package{
-			GoPackagePath: repoRoot.Root,
+			GoPackagePath: goPackagePath,
 			URL:           repoRoot.Repo,
 			Rev:           entry.rev,
 			Sha256:        sha256,
