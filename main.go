@@ -51,7 +51,7 @@ func getModules() ([]*modEntry, error) {
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
 	var stderr bytes.Buffer
-	cmd := exec.Command("go", "list", "-json", "-m", "all")
+	cmd := exec.Command("go", "list", "-mod", "mod", "-json", "-m", "all")
 	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(),
 		"GO111MODULE=on",
