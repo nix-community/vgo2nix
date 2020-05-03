@@ -12,10 +12,11 @@ vgo2nix
 
 This will write a file called =deps.nix= that is to be used together with an expression like
 #+begin_src nix
-{ buildGoPackage }:
+{ buildGoPackage, fetchFromGitHub }:
 buildGoPackage rec {
   name = "vgo2nix-${version}";
   version = "example";
+  goPackagePath = "...";  # Incomplete
   src = fetchFromGitHub { ... };  # Incomplete
   goDeps = ./deps.nix;
 }
