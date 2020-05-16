@@ -169,10 +169,15 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			return nil, wrapError(fmt.Errorf("Bad SHA256 for repo %s with rev %s", repoRoot.Repo, entry.rev))
 		}
 
+		rev, ok := resp["rev"].(string)
+		if !ok {
+			return nil, wrapError(fmt.Errorf("Unable to read rev"))
+		}
+
 		return &Package{
 			GoPackagePath: repoRoot.Root,
 			URL:           repoRoot.Repo,
-			Rev:           entry.rev,
+			Rev:           rev,
 			Sha256:        sha256,
 		}, nil
 	}
