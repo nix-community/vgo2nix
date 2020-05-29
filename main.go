@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/vcs"
+	"golang.org/x/mod/module"
 )
 
 type Package struct {
@@ -44,8 +46,7 @@ const depNixFormat = `  {
 
 func getModules() ([]*modEntry, error) {
 	var entries []*modEntry
-
-	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:\d+\.)?[0-9]{14}-(.*?)$`)
+	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:\d+\.)?[0-9]{14}-(.*?)(?:\+incompatible)?$`)
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
@@ -66,8 +67,9 @@ func getModules() ([]*modEntry, error) {
 
 	type goMod struct {
 		Path    string
-		Main    bool
 		Version string
+		Main    bool
+		Replace *goMod
 	}
 
 	var mods []goMod
@@ -80,9 +82,16 @@ func getModules() ([]*modEntry, error) {
 			return nil, err
 		}
 
-		if !mod.Main {
-			mods = append(mods, mod)
+		if mod.Main {
+			continue
 		}
+
+		if mod.Replace != nil {
+			mod.Path = mod.Replace.Path
+			mod.Version = mod.Replace.Version
+		}
+
+		mods = append(mods, mod)
 	}
 
 	if err := cmd.Wait(); err != nil {
@@ -90,6 +99,7 @@ func getModules() ([]*modEntry, error) {
 	}
 
 	for _, mod := range mods {
+		path := mod.Path
 		rev := mod.Version
 		if commitShaRev.MatchString(rev) {
 			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
@@ -97,13 +107,24 @@ func getModules() ([]*modEntry, error) {
 			rev = commitRevV2.FindAllStringSubmatch(rev, -1)[0][1]
 		} else if commitRevV3.MatchString(rev) {
 			rev = commitRevV3.FindAllStringSubmatch(rev, -1)[0][1]
+		} else if strings.Count(path, "/") > 2 {
+			// Leave semantic version alone
+			if _, _, ok := module.SplitPathVersion(mod.Path); ok {
+				continue
+			}
+
+			p := strings.Split(path, "/")
+			path = strings.Join(p[0:3], "/")
+			rev = strings.Join(p[3:len(p)], "/") + "/" + rev
 		}
-		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", mod.Path, rev))
+
+		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", path, rev))
 		entries = append(entries, &modEntry{
-			importPath: mod.Path,
+			importPath: path,
 			rev:        rev,
 		})
 	}
+
 
 	return entries, nil
 }
