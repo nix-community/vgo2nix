@@ -143,6 +143,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			"nix-prefetch-git",
 			"--quiet",
 			"--fetch-submodules",
+			"--no-deepClone",
 			"--url", repoRoot.Repo,
 			"--rev", entry.rev).Output()
 		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
