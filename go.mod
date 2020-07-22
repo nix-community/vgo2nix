@@ -1,4 +1,4 @@
-module github.com/adisbladis/vgo2nix
+module github.com/nix-community/vgo2nix
 
 go 1.14
 
