@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/vcs"
 )
@@ -49,6 +50,7 @@ func getModules() ([]*modEntry, error) {
 	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:\d+\.)?[0-9]{14}-(.*?)(?:\+incompatible)?$`)
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
+	versionNumber := regexp.MustCompile(`^v\d+`)
 
 	var stderr bytes.Buffer
 	cmd := exec.Command("go", "list", "-mod", "mod", "-json", "-m", "all")
@@ -102,13 +104,24 @@ func getModules() ([]*modEntry, error) {
 
 	for _, mod := range mods {
 		rev := mod.Version
+		url, err := vcs.RepoRootForImportPath(mod.Path, false)
+		if err != nil {
+			return nil, err
+		}
+
 		if commitShaRev.MatchString(rev) {
 			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
 		} else if commitRevV2.MatchString(rev) {
 			rev = commitRevV2.FindAllStringSubmatch(rev, -1)[0][1]
 		} else if commitRevV3.MatchString(rev) {
 			rev = commitRevV3.FindAllStringSubmatch(rev, -1)[0][1]
+		} else if mod.Path != url.Root {
+			subPath := strings.Split(mod.Path, url.Root+"/")[1]
+			if !versionNumber.MatchString(subPath) {
+				rev = subPath + "/" + rev
+			}
 		}
+
 		replacePath := mod.Path
 		if mod.Replace != nil {
 			replacePath = mod.Replace.Path
