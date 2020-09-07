@@ -185,7 +185,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		if err != nil {
 			exitError, ok := err.(*exec.ExitError)
 			if ok {
-				return nil, wrapError(fmt.Errorf("nix-prefetch-git --fetch-submodules --url %s --rev %s failed:\n%s",
+				return nil, wrapError(fmt.Errorf("nix-prefetch-git --fetch-submodules --no-deepClone --url %s --rev %s failed:\n%s",
 					repoRoot.Repo,
 					entry.rev,
 					exitError.Stderr))
