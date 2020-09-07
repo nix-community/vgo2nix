@@ -113,7 +113,7 @@ func getModules() ([]*modEntry, error) {
 		if mod.Replace != nil {
 			replacePath = mod.Replace.Path
 		}
-		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", mod.Path, rev))
+		fmt.Println(fmt.Sprintf("goPackagePath %s has rev: %s", mod.Path, rev))
 		entries = append(entries, &modEntry{
 			replacePath: replacePath,
 			importPath:  mod.Path,
@@ -190,7 +190,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		sha256 := resp["sha256"].(string)
 
 		if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
-			return nil, wrapError(fmt.Errorf("Bad SHA256 for repo %s with rev %s", repoRoot.Repo, entry.rev))
+			return nil, wrapError(fmt.Errorf("Bad SHA256 for repo %s with rev: %s", repoRoot.Repo, entry.rev))
 		}
 
 		return &Package{
