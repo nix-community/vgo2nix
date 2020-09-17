@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/vcs"
 )
@@ -30,6 +31,7 @@ type PackageResult struct {
 type modEntry struct {
 	importPath string
 	rev        string
+	isTagRev   bool
 }
 
 const depNixFormat = `  {
@@ -45,7 +47,7 @@ const depNixFormat = `  {
 func getModules() ([]*modEntry, error) {
 	var entries []*modEntry
 
-	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:\d+\.)?[0-9]{14}-(.*?)$`)
+	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:.+\.)?[0-9]{14}-(.*?)(\+incompatible)?$`)
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
@@ -91,8 +93,10 @@ func getModules() ([]*modEntry, error) {
 
 	for _, mod := range mods {
 		rev := mod.Version
+		isTagRev := true
 		if commitShaRev.MatchString(rev) {
 			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
+			isTagRev = false
 		} else if commitRevV2.MatchString(rev) {
 			rev = commitRevV2.FindAllStringSubmatch(rev, -1)[0][1]
 		} else if commitRevV3.MatchString(rev) {
@@ -102,6 +106,7 @@ func getModules() ([]*modEntry, error) {
 		entries = append(entries, &modEntry{
 			importPath: mod.Path,
 			rev:        rev,
+			isTagRev:   isTagRev,
 		})
 	}
 
@@ -139,12 +144,24 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/development/go-modules/generic/default.nix#L54-L56
 		// and fetchgit's defaults:
 		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/build-support/fetchgit/default.nix#L15-L23
+		rev := entry.rev
+		// convert tag
+		if entry.isTagRev && entry.importPath != goPackagePath {
+			// trim repo root
+			modulePath := strings.TrimPrefix(entry.importPath, goPackagePath+"/")
+			// trim major version
+			majorVersion := strings.SplitN(entry.rev, ".", 2)[0]
+			if modulePath != majorVersion {
+				modulePath = strings.TrimPrefix(modulePath, majorVersion+"/")
+				rev = modulePath + "/" + entry.rev
+			}
+		}
 		jsonOut, err := exec.Command(
 			"nix-prefetch-git",
 			"--quiet",
 			"--fetch-submodules",
 			"--url", repoRoot.Repo,
-			"--rev", entry.rev).Output()
+			"--rev", rev).Output()
 		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
 
 		if err != nil {
@@ -152,7 +169,7 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			if ok {
 				return nil, wrapError(fmt.Errorf("nix-prefetch-git --fetch-submodules --url %s --rev %s failed:\n%s",
 					repoRoot.Repo,
-					entry.rev,
+					rev,
 					exitError.Stderr))
 			} else {
 
