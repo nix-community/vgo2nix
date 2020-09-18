@@ -10,7 +10,7 @@
     };
   }
   {
-    goPackagePath = "github.com/godbus/dbus";
+    goPackagePath = "github.com/godbus/dbus/v5";
     fetch = {
       type = "git";
       url = "https://github.com/godbus/dbus";
