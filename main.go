@@ -44,13 +44,14 @@ const depNixFormat = `  {
     };
   }`
 
+var versionNumber = regexp.MustCompile(`^v\d+`)
+
 func getModules() ([]*modEntry, error) {
 	var entries []*modEntry
 
 	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:rc\d+\.)?(?:\d+\.)?[0-9]{14}-(.*?)(?:\+incompatible)?$`)
 	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
 	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
-	versionNumber := regexp.MustCompile(`^v\d+`)
 
 	var stderr bytes.Buffer
 	cmd := exec.Command("go", "list", "-mod", "mod", "-json", "-m", "all")
@@ -162,6 +163,9 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			return nil, wrapError(err)
 		}
 		goPackagePath := importRoot.Root
+		if versionNumber.MatchString(strings.TrimPrefix(entry.importPath, importRoot.Root+"/")) {
+			goPackagePath = entry.importPath
+		}
 
 		if prevPkg, ok := prevDeps[goPackagePath]; ok {
 			if prevPkg.Rev == entry.rev {
