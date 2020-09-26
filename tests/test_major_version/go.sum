@@ -1,0 +1,10 @@
+github.com/yihuang/test-golang-module-major-version v1.0.1 h1:/k3OIPYLrQymj44jPgwG6v2JUEqsClgohLNsnnoujxk=
+github.com/yihuang/test-golang-module-major-version v1.0.1/go.mod h1:6ffZEJfhUE+kNfJqTGgm162S5pSCL8pOfJRTJwT1cUU=
+github.com/yihuang/test-golang-module-major-version/sub v1.0.1 h1:J7EEv0ogIPqeaZpK/59St9aPiS1Fdi0cwDCvIJH/eaM=
+github.com/yihuang/test-golang-module-major-version/sub v1.0.1/go.mod h1:03uOGLsMBIDw1AHgKu7tZyRWSzlMou2bNEi99gUqD4Y=
+github.com/yihuang/test-golang-module-major-version/sub/v2 v2.0.1 h1:OzYeUqx0m4ctMJgdjl5+OD5ZGH9N4X8i9uC5Ibx3l9A=
+github.com/yihuang/test-golang-module-major-version/sub/v2 v2.0.1/go.mod h1:/IrwjSq8jNEebG7aFnJbdgcSyyldSG23VDZzCePZZi0=
+github.com/yihuang/test-golang-module-major-version/v2 v2.0.1 h1:uW41SEo7xYdcK3IiRXVoWeZQbJWK81GKC7pGGZEhlbo=
+github.com/yihuang/test-golang-module-major-version/v2 v2.0.1/go.mod h1:aBzLwyu2rt20DK0DbRBUKOLPiRfQ47OhZUE4KNs32DI=
+github.com/yihuang/test-golang-module-major-version/v2 v2.0.2-0.20200924181748-4a13e4bfd5a9 h1:1MtOSTQvrqLEBdqQgBDxUFcnQR5wmbMBIfjPkZz2pfA=
+github.com/yihuang/test-golang-module-major-version/v2 v2.0.2-0.20200924181748-4a13e4bfd5a9/go.mod h1:aBzLwyu2rt20DK0DbRBUKOLPiRfQ47OhZUE4KNs32DI=
