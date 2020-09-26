@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/mod/module"
+	"golang.org/x/mod/semver"
 	"golang.org/x/tools/go/vcs"
 )
 
@@ -48,10 +50,6 @@ var versionNumber = regexp.MustCompile(`^v\d+`)
 
 func getModules() ([]*modEntry, error) {
 	var entries []*modEntry
-
-	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:rc\d+\.)?(?:\d+\.)?[0-9]{14}-(.*?)(?:\+incompatible)?$`)
-	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
-	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
 
 	var stderr bytes.Buffer
 	cmd := exec.Command("go", "list", "-mod", "mod", "-json", "-m", "all")
@@ -110,16 +108,22 @@ func getModules() ([]*modEntry, error) {
 			return nil, err
 		}
 
-		if commitShaRev.MatchString(rev) {
-			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
-		} else if commitRevV2.MatchString(rev) {
-			rev = commitRevV2.FindAllStringSubmatch(rev, -1)[0][1]
-		} else if commitRevV3.MatchString(rev) {
-			rev = commitRevV3.FindAllStringSubmatch(rev, -1)[0][1]
-		} else if mod.Path != url.Root {
-			subPath := strings.Split(mod.Path, url.Root+"/")[1]
-			if !versionNumber.MatchString(subPath) {
-				rev = subPath + "/" + rev
+		path, _, ok := module.SplitPathVersion(mod.Path)
+		if !ok {
+			return nil, fmt.Errorf("invalid mod path: %s", mod.Path)
+		}
+
+		build := semver.Build(rev) // +incompatible
+		gitRef := strings.TrimSuffix(rev, build)
+		if strings.Count(gitRef, "-") >= 2 {
+			// pseudo-version, use the commit hash
+			gitRef = gitRef[strings.LastIndex(gitRef, "-")+1:]
+		} else {
+			// fix tag
+			subModule := strings.TrimPrefix(path, url.Root)
+			if len(subModule) > 0 {
+				// trim the leading "/"
+				gitRef = subModule[1:] + "/" + gitRef
 			}
 		}
 
@@ -131,7 +135,7 @@ func getModules() ([]*modEntry, error) {
 		entries = append(entries, &modEntry{
 			replacePath: replacePath,
 			importPath:  mod.Path,
-			rev:         rev,
+			rev:         gitRef,
 		})
 	}
 
