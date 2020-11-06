@@ -1,5 +1,3 @@
-[[https://travis-ci.org/adisbladis/vgo2nix][https://travis-ci.org/adisbladis/vgo2nix.svg?branch=master]]
-
 * vgo2nix
 
 Convert =go.mod= files to nixpkgs =buildGoPackage= compatible =deps.nix= files
