@@ -1,4 +1,4 @@
-package main // import "github.com/adisbladis/vgo2nix"
+package main // import "github.com/nix-community/vgo2nix"
 
 import (
 	"bytes"
@@ -308,7 +308,7 @@ func main() {
 		}
 	}
 
-	write("# file generated from go.mod using vgo2nix (https://github.com/adisbladis/vgo2nix)")
+	write("# file generated from go.mod using vgo2nix (https://github.com/nix-community/vgo2nix)")
 	write("[")
 	for _, pkg := range packages {
 		write(fmt.Sprintf(depNixFormat,

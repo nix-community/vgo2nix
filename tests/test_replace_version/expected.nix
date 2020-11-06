@@ -1,4 +1,4 @@
-# file generated from go.mod using vgo2nix (https://github.com/adisbladis/vgo2nix)
+# file generated from go.mod using vgo2nix (https://github.com/nix-community/vgo2nix)
 [
   {
     goPackagePath = "github.com/coreos/go-systemd";

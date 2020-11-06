@@ -1,4 +1,4 @@
-module github.com/adisbladis/vgo2nix
+module github.com/nix-community/vgo2nix
 
 require (
 	github.com/orivej/go-nix v0.0.0-20180830055821-dae45d921a44
