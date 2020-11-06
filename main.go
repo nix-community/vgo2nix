@@ -11,7 +11,10 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strings"
 
+	"golang.org/x/mod/module"
+	"golang.org/x/mod/semver"
 	"golang.org/x/tools/go/vcs"
 )
 
@@ -20,6 +23,7 @@ type Package struct {
 	URL           string
 	Rev           string
 	Sha256        string
+	ModuleDir     string
 }
 
 type PackageResult struct {
@@ -29,7 +33,9 @@ type PackageResult struct {
 
 type modEntry struct {
 	importPath string
+	repo       string
 	rev        string
+	moduleDir  string
 }
 
 const depNixFormat = `  {
@@ -39,18 +45,17 @@ const depNixFormat = `  {
       url = "%s";
       rev = "%s";
       sha256 = "%s";
+      moduleDir = "%s";
     };
   }`
+
+var versionNumber = regexp.MustCompile(`^v\d+`)
 
 func getModules() ([]*modEntry, error) {
 	var entries []*modEntry
 
-	commitShaRev := regexp.MustCompile(`^v\d+\.\d+\.\d+-(?:\d+\.)?[0-9]{14}-(.*?)$`)
-	commitRevV2 := regexp.MustCompile("^v.*-(.{12})\\+incompatible$")
-	commitRevV3 := regexp.MustCompile(`^(v\d+\.\d+\.\d+)\+incompatible$`)
-
 	var stderr bytes.Buffer
-	cmd := exec.Command("go", "list", "-json", "-m", "all")
+	cmd := exec.Command("go", "list", "-mod", "mod", "-json", "-m", "all")
 	cmd.Stderr = &stderr
 	cmd.Env = append(os.Environ(),
 		"GO111MODULE=on",
@@ -64,10 +69,16 @@ func getModules() ([]*modEntry, error) {
 		return nil, err
 	}
 
+	type goModReplacement struct {
+		Path    string
+		Version string
+	}
+
 	type goMod struct {
 		Path    string
 		Main    bool
 		Version string
+		Replace *goModReplacement
 	}
 
 	var mods []goMod
@@ -90,18 +101,56 @@ func getModules() ([]*modEntry, error) {
 	}
 
 	for _, mod := range mods {
-		rev := mod.Version
-		if commitShaRev.MatchString(rev) {
-			rev = commitShaRev.FindAllStringSubmatch(rev, -1)[0][1]
-		} else if commitRevV2.MatchString(rev) {
-			rev = commitRevV2.FindAllStringSubmatch(rev, -1)[0][1]
-		} else if commitRevV3.MatchString(rev) {
-			rev = commitRevV3.FindAllStringSubmatch(rev, -1)[0][1]
+		replacedPath := mod.Path
+		version := mod.Version
+		if mod.Replace != nil {
+			replacedPath = mod.Replace.Path
+			version = mod.Replace.Version
 		}
-		fmt.Println(fmt.Sprintf("goPackagePath %s has rev %s", mod.Path, rev))
+
+		// find repo, and codeRoot
+		repo, err := vcs.RepoRootForImportPath(replacedPath, false)
+		if err != nil {
+			return nil, err
+		}
+
+		// https://github.com/golang/go/blob/7bb6fed9b53494e9846689520b41b8e679bd121d/src/cmd/go/internal/modfetch/coderepo.go#L65
+		pathPrefix := replacedPath
+		if repo.Root != replacedPath {
+			var ok bool
+			pathPrefix, _, ok = module.SplitPathVersion(pathPrefix)
+			if !ok {
+				return nil, fmt.Errorf("invalid mod path: %s", replacedPath)
+			}
+		}
+
+		// find submodule relative directory
+		// https://github.com/golang/go/blob/7bb6fed9b53494e9846689520b41b8e679bd121d/src/cmd/go/internal/modfetch/coderepo.go#L74
+		moduleDir := ""
+		if pathPrefix != repo.Root {
+			moduleDir = strings.TrimPrefix(pathPrefix, repo.Root+"/")
+		}
+
+		// convert version to git ref
+		// https://github.com/golang/go/blob/7bb6fed9b53494e9846689520b41b8e679bd121d/src/cmd/go/internal/modfetch/coderepo.go#L656
+		build := semver.Build(version) // +incompatible
+		gitRef := strings.TrimSuffix(version, build)
+		if strings.Count(gitRef, "-") >= 2 {
+			// pseudo-version, use the commit hash
+			gitRef = gitRef[strings.LastIndex(gitRef, "-")+1:]
+		} else {
+			if len(moduleDir) > 0 {
+				// fix tag for submodule
+				gitRef = moduleDir + "/" + gitRef
+			}
+		}
+
+		fmt.Println(fmt.Sprintf("goPackagePath %s has rev: %s, module: %s", mod.Path, gitRef, moduleDir))
 		entries = append(entries, &modEntry{
 			importPath: mod.Path,
-			rev:        rev,
+			repo:       repo.Repo,
+			rev:        gitRef,
+			moduleDir:  moduleDir,
 		})
 	}
 
@@ -119,21 +168,14 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			return fmt.Errorf("Error processing import path \"%s\": %v", entry.importPath, err)
 		}
 
-		repoRoot, err := vcs.RepoRootForImportPath(
-			entry.importPath,
-			false)
-		if err != nil {
-			return nil, wrapError(err)
-		}
-		goPackagePath := repoRoot.Root
-
-		if prevPkg, ok := prevDeps[goPackagePath]; ok {
-			if prevPkg.Rev == entry.rev {
+		if prevPkg, ok := prevDeps[entry.importPath]; ok {
+			if prevPkg.URL == entry.repo && prevPkg.Rev == entry.rev {
+				prevPkg.ModuleDir = entry.moduleDir
 				return prevPkg, nil
 			}
 		}
 
-		fmt.Println(fmt.Sprintf("Fetching %s", goPackagePath))
+		fmt.Println(fmt.Sprintf("Fetching %s %s", entry.importPath, entry.repo))
 		// The options for nix-prefetch-git need to match how buildGoPackage
 		// calls fetchgit:
 		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/development/go-modules/generic/default.nix#L54-L56
@@ -143,22 +185,21 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 			"nix-prefetch-git",
 			"--quiet",
 			"--fetch-submodules",
-			"--url", repoRoot.Repo,
+			"--no-deepClone",
+			"--url", entry.repo,
 			"--rev", entry.rev).Output()
-		fmt.Println(fmt.Sprintf("Finished fetching %s", goPackagePath))
-
 		if err != nil {
 			exitError, ok := err.(*exec.ExitError)
 			if ok {
-				return nil, wrapError(fmt.Errorf("nix-prefetch-git --fetch-submodules --url %s --rev %s failed:\n%s",
-					repoRoot.Repo,
+				return nil, wrapError(fmt.Errorf("nix-prefetch-git --fetch-submodules --no-deepClone --url %s --rev %s failed:\n%s",
+					entry.repo,
 					entry.rev,
 					exitError.Stderr))
-			} else {
-
-				return nil, wrapError(fmt.Errorf("failed to execute nix-prefetch-git: %v", err))
 			}
+			return nil, wrapError(fmt.Errorf("failed to execute nix-prefetch-git: %v", err))
 		}
+		fmt.Println(fmt.Sprintf("Finished fetching %s", entry.importPath))
+
 		var resp map[string]interface{}
 		if err := json.Unmarshal(jsonOut, &resp); err != nil {
 			return nil, wrapError(err)
@@ -166,14 +207,15 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		sha256 := resp["sha256"].(string)
 
 		if sha256 == "0sjjj9z1dhilhpc8pq4154czrb79z9cm044jvn75kxcjv6v5l2m5" {
-			return nil, wrapError(fmt.Errorf("Bad SHA256 for repo %s with rev %s", repoRoot.Repo, entry.rev))
+			return nil, wrapError(fmt.Errorf("Bad SHA256 for repo %s with rev: %s", entry.repo, entry.rev))
 		}
 
 		return &Package{
-			GoPackagePath: repoRoot.Root,
-			URL:           repoRoot.Repo,
+			GoPackagePath: entry.importPath,
+			URL:           entry.repo,
 			Rev:           entry.rev,
 			Sha256:        sha256,
+			ModuleDir:     entry.moduleDir,
 		}, nil
 	}
 
@@ -271,7 +313,7 @@ func main() {
 	for _, pkg := range packages {
 		write(fmt.Sprintf(depNixFormat,
 			pkg.GoPackagePath, "git", pkg.URL,
-			pkg.Rev, pkg.Sha256))
+			pkg.Rev, pkg.Sha256, pkg.ModuleDir))
 	}
 	write("]")
 

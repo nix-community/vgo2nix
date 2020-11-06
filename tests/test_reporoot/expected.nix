@@ -5,8 +5,19 @@
     fetch = {
       type = "git";
       url = "https://github.com/ugorji/go";
+      rev = "v1.1.2";
+      sha256 = "0fq4k5239w29qv587a95ivzmdf5jnbhdmc4y2ny87nw3i3qmgsj4";
+      moduleDir = "";
+    };
+  }
+  {
+    goPackagePath = "github.com/ugorji/go/codec";
+    fetch = {
+      type = "git";
+      url = "https://github.com/ugorji/go";
       rev = "8fd0f8d918c8";
       sha256 = "0fq4k5239w29qv587a95ivzmdf5jnbhdmc4y2ny87nw3i3qmgsj4";
+      moduleDir = "codec";
     };
   }
 ]
