@@ -181,6 +181,15 @@ func getPackages(keepGoing bool, numJobs int, prevDeps map[string]*Package) ([]*
 		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/development/go-modules/generic/default.nix#L54-L56
 		// and fetchgit's defaults:
 		// https://github.com/NixOS/nixpkgs/blob/8d8e56824de52a0c7a64d2ad2c4ed75ed85f446a/pkgs/build-support/fetchgit/default.nix#L15-L23
+		if !strings.HasPrefix(entry.repo, "http") {
+			entry.repo = "http://" + entry.repo
+		}
+
+		if _, err := exec.Command("git", "ls-remote", entry.repo).Output(); err != nil {
+			fmt.Printf("Repo %s not found. Trying with %s.git\n", entry.repo, entry.repo)
+			entry.repo = entry.repo + ".git"
+		}
+
 		jsonOut, err := exec.Command(
 			"nix-prefetch-git",
 			"--quiet",
