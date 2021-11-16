@@ -4,7 +4,7 @@ mkShell rec {
   buildInputs = [
     nix-prefetch-git
     go
-  ] ++ stdenv.lib.optionals stdenv.isDarwin [
+  ] ++ lib.optionals stdenv.isDarwin [
     darwin.apple_sdk.frameworks.Security
   ];
 
