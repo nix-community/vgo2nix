@@ -18,13 +18,13 @@ buildGoPackage rec {
 
   allowGoReference = true;
 
-  postInstall = with stdenv; let
+  postInstall = let
     binPath = lib.makeBinPath [ nix-prefetch-git go ];
   in ''
     wrapProgram $out/bin/vgo2nix --prefix PATH : ${binPath}
   '';
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "Convert go.mod files to nixpkgs buildGoPackage compatible deps.nix files";
     homepage = https://github.com/nix-community/vgo2nix;
     license = licenses.mit;
