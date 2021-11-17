@@ -2,6 +2,14 @@
 
 Convert =go.mod= files to nixpkgs =buildGoPackage= compatible =deps.nix= files
 
+** Installation
+
+You can install the most recent vgo2nix by executing
+
+#+begin_src
+nix-env -i vgo2nix-git -f https://github.com/adisbladis/vgo2nix/archive/master.tar.gz
+#+end_src
+
 ** Usage
 From the go project directory execute
 #+begin_src
